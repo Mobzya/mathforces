@@ -32,7 +32,7 @@ jobs:
       DATABASE_URL: postgresql://mathforces:mathforces@localhost:5432/mathforces?schema=public
       SUBMISSION_STORAGE_DIR: /tmp/mathforces-ci-storage
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           cache: npm
