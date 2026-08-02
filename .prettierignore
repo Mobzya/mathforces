@@ -1,0 +1,8 @@
+.next
+generated
+node_modules
+storage
+backups
+package-lock.json
+prisma/migrations
+public/sw.js

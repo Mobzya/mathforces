@@ -1,0 +1,35 @@
+# dependencies
+/node_modules
+
+# Next.js
+/.next
+/out
+
+# generated
+/generated/prisma
+
+# local environment
+.env
+.env.*
+!.env.example
+
+# logs and system files
+*.log
+.DS_Store
+.agents/
+.codex/
+.idea/
+.vscode/
+
+# local submission storage
+/storage/submissions
+/backups
+
+# test and coverage artifacts
+/coverage
+/playwright-report
+/test-results
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts

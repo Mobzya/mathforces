@@ -1,0 +1,49 @@
+name: CI
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: mathforces
+          POSTGRES_PASSWORD: mathforces
+          POSTGRES_USER: mathforces
+        options: >-
+          --health-cmd "pg_isready -U mathforces -d mathforces" --health-interval 5s
+          --health-timeout 3s --health-retries 20
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgresql://mathforces:mathforces@localhost:5432/mathforces?schema=public
+      SUBMISSION_STORAGE_DIR: /tmp/mathforces-ci-storage
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          cache: npm
+          node-version: 24
+      - run: npm ci
+      - run: npm run db:deploy
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:unit
+      - run: npm run test:queue
+      - run: npm run test:cycle
+      - run: npm run security:audit
+      - run: npm run build

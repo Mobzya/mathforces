@@ -1,0 +1,7 @@
+ALTER TYPE "ContestFinalizationStatus" ADD VALUE IF NOT EXISTS 'NEEDS_REVIEW';
+
+ALTER TABLE "Contest"
+ADD COLUMN "resultsRevision" INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE "RatingCalculation"
+ADD COLUMN "resultsRevision" INTEGER NOT NULL DEFAULT 0;

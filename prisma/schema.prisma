@@ -1,0 +1,730 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  PARTICIPANT
+  ADMIN
+}
+
+enum ContestStatus {
+  ANNOUNCED
+  RUNNING
+  FINISHED
+}
+
+enum ProblemTopic {
+  ARITHMETIC
+  ALGEBRA
+  COMBINATORICS
+  NUMBER_THEORY
+  GEOMETRY
+  PROBABILITY
+  CALCULUS
+  LOGIC
+  GRAPH_THEORY
+  SET_THEORY
+  STATISTICS
+  APPLIED_MATH
+}
+
+enum PracticeAttemptStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  NEEDS_REVIEW
+  FAILED
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+}
+
+enum SubmissionStatus {
+  QUEUED
+  PROCESSING
+  PRELIMINARY_READY
+  NEEDS_REVIEW
+  FINALIZED
+  REJECTED
+}
+
+enum SubmissionCommentKind {
+  SYSTEM
+  AI
+  ADMIN
+}
+
+enum EvaluationMode {
+  PRELIMINARY
+  REJUDGE
+}
+
+enum QueueJobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ContestFinalizationStatus {
+  QUEUED
+  PROCESSING
+  NEEDS_REVIEW
+  COMPLETED
+  FAILED
+}
+
+enum EvaluationStatus {
+  PROCESSING
+  COMPLETED
+  NEEDS_REVIEW
+  FAILED
+}
+
+enum EvaluationConfidence {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum JudgeRunStage {
+  PREPROCESS
+  OCR
+  STRUCTURE
+  SCORING
+  REVIEW
+}
+
+model User {
+  id                     String                    @id @default(uuid()) @db.Uuid
+  email                  String                    @unique @db.VarChar(254)
+  nickname               String                    @db.VarChar(24)
+  nicknameNormalized     String                    @unique @db.VarChar(24)
+  passwordHash           String                    @db.VarChar(255)
+  description            String                    @default("") @db.VarChar(400)
+  grade                  Int?
+  avatarStorageKey       String?                   @db.VarChar(255)
+  avatarMimeType         String?                   @db.VarChar(40)
+  avatarVersion          Int                       @default(0)
+  profileAccent          String                    @default("crimson") @db.VarChar(20)
+  profilePattern         String                    @default("grid") @db.VarChar(20)
+  favoriteTopic          ProblemTopic?
+  showGrade              Boolean                   @default(true)
+  showOrganization       Boolean                   @default(true)
+  currentRating          Int                       @default(0)
+  maxRating              Int                       @default(0)
+  lastSeenAt             DateTime                  @default(now())
+  role                   UserRole                  @default(PARTICIPANT)
+  organizationId         String                    @db.Uuid
+  organization           Organization              @relation("OrganizationMembers", fields: [organizationId], references: [id], onDelete: Restrict)
+  createdOrganizations   Organization[]            @relation("OrganizationCreator")
+  organizationHistory    UserOrganizationHistory[] @relation("OrganizationHistoryUser")
+  sessions               AuthSession[]
+  passwordResetTokens    PasswordResetToken[]      @relation("PasswordResetUser")
+  createdPasswordResets  PasswordResetToken[]      @relation("PasswordResetCreator")
+  createdContests        Contest[]                 @relation("ContestCreator")
+  adminActions           AdminAction[]             @relation("AdminActionAuthor")
+  ratingCalculations     RatingCalculation[]       @relation("RatingCalculationAuthor")
+  ratingChanges          RatingChange[]
+  ratingSeeds            ContestRatingSeed[]
+  requestedFinalizations ContestFinalization[]     @relation("FinalizationRequester")
+  contestRegistrations   ContestRegistration[]
+  submissions            Submission[]
+  practiceAttempts       PracticeAttempt[]
+  problemComments        ProblemComment[]
+  problemCommentVotes    ProblemCommentVote[]
+  problemStars           ProblemStar[]
+  friendshipsA           Friendship[]              @relation("FriendshipUserA")
+  friendshipsB           Friendship[]              @relation("FriendshipUserB")
+  requestedFriendships   Friendship[]              @relation("FriendshipRequester")
+  newsPosts              NewsPost[]                @relation("NewsPostAuthor")
+  newsComments           NewsComment[]
+  newsCommentVotes       NewsCommentVote[]
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+
+  @@index([organizationId])
+  @@index([currentRating])
+  @@index([currentRating, nicknameNormalized])
+  @@index([organizationId, currentRating, nicknameNormalized])
+}
+
+model Organization {
+  id             String                    @id @default(uuid()) @db.Uuid
+  name           String                    @db.VarChar(80)
+  normalizedName String                    @unique @db.VarChar(80)
+  createdById    String?                   @db.Uuid
+  createdBy      User?                     @relation("OrganizationCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  members        User[]                    @relation("OrganizationMembers")
+  historyFrom    UserOrganizationHistory[] @relation("OrganizationHistoryFrom")
+  historyTo      UserOrganizationHistory[] @relation("OrganizationHistoryTo")
+  scopedContests Contest[]
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+}
+
+model UserOrganizationHistory {
+  id                 String        @id @default(uuid()) @db.Uuid
+  userId             String        @db.Uuid
+  user               User          @relation("OrganizationHistoryUser", fields: [userId], references: [id], onDelete: Cascade)
+  fromOrganizationId String?       @db.Uuid
+  fromOrganization   Organization? @relation("OrganizationHistoryFrom", fields: [fromOrganizationId], references: [id], onDelete: SetNull)
+  toOrganizationId   String        @db.Uuid
+  toOrganization     Organization  @relation("OrganizationHistoryTo", fields: [toOrganizationId], references: [id], onDelete: Restrict)
+  changedAt          DateTime      @default(now())
+
+  @@index([userId, changedAt])
+  @@index([fromOrganizationId])
+  @@index([toOrganizationId])
+}
+
+model AuthSession {
+  id        String   @id @default(uuid()) @db.Uuid
+  tokenHash String   @unique @db.Char(64)
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id          String    @id @default(uuid()) @db.Uuid
+  tokenHash   String    @unique @db.Char(64)
+  userId      String    @db.Uuid
+  user        User      @relation("PasswordResetUser", fields: [userId], references: [id], onDelete: Cascade)
+  createdById String?   @db.Uuid
+  createdBy   User?     @relation("PasswordResetCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
+  @@index([createdById, createdAt])
+}
+
+model Contest {
+  id                         String                 @id @default(uuid()) @db.Uuid
+  title                      String                 @db.VarChar(120)
+  description                String                 @default("") @db.Text
+  rules                      String                 @default("") @db.Text
+  tags                       String[]               @default([])
+  startAt                    DateTime
+  endAt                      DateTime
+  durationMinutes            Int                    @default(90)
+  registrationClosesAt       DateTime?
+  requiredProblemCount       Int                    @default(5)
+  showStandingsDuringContest Boolean                @default(true)
+  showOthersSubmissions      Boolean                @default(true)
+  showSubmissionComments     Boolean                @default(false)
+  showPreliminaryScores      Boolean                @default(true)
+  reviewConfidenceThreshold  Float                  @default(0.72)
+  autoFinalRejudge           Boolean                @default(true)
+  autoCalculateRating        Boolean                @default(true)
+  autoPublishArchive         Boolean                @default(true)
+  status                     ContestStatus          @default(ANNOUNCED)
+  resultsRevision            Int                    @default(0)
+  isPublic                   Boolean                @default(true)
+  organizationId             String?                @db.Uuid
+  organization               Organization?          @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  createdById                String?                @db.Uuid
+  createdBy                  User?                  @relation("ContestCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  problems                   Problem[]
+  registrations              ContestRegistration[]
+  submissions                Submission[]
+  ratingCalculation          RatingCalculation?
+  ratingChanges              RatingChange[]
+  ratingSnapshot             ContestRatingSnapshot?
+  finalization               ContestFinalization?
+  createdAt                  DateTime               @default(now())
+  updatedAt                  DateTime               @updatedAt
+
+  @@index([status, startAt])
+  @@index([organizationId])
+  @@index([createdById])
+}
+
+model Problem {
+  id                   String            @id @default(uuid()) @db.Uuid
+  contestId            String            @db.Uuid
+  contest              Contest           @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  sourceProblemId      String?           @db.Uuid
+  sourceProblem        Problem?          @relation("ProblemArchiveCopies", fields: [sourceProblemId], references: [id], onDelete: SetNull)
+  archiveCopies        Problem[]         @relation("ProblemArchiveCopies")
+  title                String            @db.VarChar(120)
+  statement            String            @db.Text
+  topic                ProblemTopic
+  subtopic             String            @default("") @db.VarChar(80)
+  baseScore            Int
+  maxScore             Int
+  scoreDecayPer5Min    Int               @default(5)
+  orderIndex           Int
+  evaluationRubric     String            @default("") @db.Text
+  archiveEnabled       Boolean           @default(true)
+  archivedAt           DateTime?
+  archiveIntro         String            @default("") @db.Text
+  officialSolution     String            @default("") @db.Text
+  difficultyRating     Int?
+  difficultyConfidence Float?
+  difficultyIndexedAt  DateTime?
+  isFeatured           Boolean           @default(false)
+  submissions          Submission[]
+  practiceAttempts     PracticeAttempt[]
+  comments             ProblemComment[]
+  stars                ProblemStar[]
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  @@unique([contestId, orderIndex])
+  @@index([contestId])
+  @@index([sourceProblemId])
+  @@index([archivedAt, isFeatured, difficultyRating])
+  @@index([topic, subtopic, difficultyRating])
+}
+
+model PracticeAttempt {
+  id             String                @id @default(uuid()) @db.Uuid
+  userId         String                @db.Uuid
+  user           User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problemId      String                @db.Uuid
+  problem        Problem               @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  storageKey     String                @unique @db.VarChar(180)
+  originalName   String                @db.VarChar(255)
+  mimeType       String                @db.VarChar(80)
+  sizeBytes      Int
+  sha256         String                @db.Char(64)
+  status         PracticeAttemptStatus @default(QUEUED)
+  score          Int?
+  feedback       String                @default("") @db.Text
+  recognizedText String                @default("") @db.Text
+  error          String                @default("") @db.Text
+  needsReview    Boolean               @default(false)
+  completedAt    DateTime?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  jobs           PracticeAttemptJob[]
+
+  @@index([userId, createdAt])
+  @@index([userId, problemId, score])
+  @@index([problemId, score, createdAt])
+  @@index([status, createdAt])
+}
+
+model PracticeAttemptJob {
+  id          String          @id @default(uuid()) @db.Uuid
+  attemptId   String          @db.Uuid
+  attempt     PracticeAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  status      QueueJobStatus  @default(QUEUED)
+  attempts    Int             @default(0)
+  maxAttempts Int             @default(3)
+  availableAt DateTime        @default(now())
+  lockedAt    DateTime?
+  workerId    String?         @db.VarChar(120)
+  error       String          @default("") @db.Text
+  completedAt DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([status, availableAt, createdAt])
+  @@index([attemptId, createdAt])
+}
+
+model ProblemStar {
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problemId String   @db.Uuid
+  problem   Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, problemId])
+  @@index([problemId, createdAt])
+}
+
+model ProblemComment {
+  id        String               @id @default(uuid()) @db.Uuid
+  userId    String               @db.Uuid
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problemId String               @db.Uuid
+  problem   Problem              @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  body      String               @db.VarChar(1200)
+  editedAt  DateTime?
+  createdAt DateTime             @default(now())
+  votes     ProblemCommentVote[]
+
+  @@index([problemId, createdAt])
+  @@index([userId, createdAt])
+}
+
+model ProblemCommentVote {
+  userId    String         @db.Uuid
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commentId String         @db.Uuid
+  comment   ProblemComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  value     Int
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@id([userId, commentId])
+  @@index([commentId, value])
+}
+
+model Friendship {
+  id            String           @id @default(uuid()) @db.Uuid
+  userAId       String           @db.Uuid
+  userA         User             @relation("FriendshipUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userBId       String           @db.Uuid
+  userB         User             @relation("FriendshipUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  requestedById String           @db.Uuid
+  requestedBy   User             @relation("FriendshipRequester", fields: [requestedById], references: [id], onDelete: Cascade)
+  status        FriendshipStatus @default(PENDING)
+  createdAt     DateTime         @default(now())
+  respondedAt   DateTime?
+
+  @@unique([userAId, userBId])
+  @@index([userAId, status])
+  @@index([userBId, status])
+  @@index([requestedById, status])
+}
+
+model ArchiveRatingIndex {
+  id           String   @id @default(uuid()) @db.Uuid
+  month        String   @unique @db.Char(7)
+  problemCount Int
+  metadata     Json?
+  createdAt    DateTime @default(now())
+}
+
+model FaqSection {
+  id          String    @id @default(uuid()) @db.Uuid
+  title       String    @db.VarChar(120)
+  slug        String    @unique @db.VarChar(120)
+  description String    @default("") @db.VarChar(500)
+  orderIndex  Int       @default(1)
+  isPublished Boolean   @default(true)
+  items       FaqItem[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([isPublished, orderIndex])
+}
+
+model FaqItem {
+  id          String     @id @default(uuid()) @db.Uuid
+  sectionId   String     @db.Uuid
+  section     FaqSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  question    String     @db.VarChar(240)
+  answer      String     @db.Text
+  orderIndex  Int        @default(1)
+  isPublished Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([sectionId, isPublished, orderIndex])
+}
+
+model NewsPost {
+  id          String        @id @default(uuid()) @db.Uuid
+  authorId    String?       @db.Uuid
+  author      User?         @relation("NewsPostAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  title       String        @db.VarChar(160)
+  excerpt     String        @default("") @db.VarChar(500)
+  body        String        @db.Text
+  isPublished Boolean       @default(false)
+  publishedAt DateTime?
+  comments    NewsComment[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([isPublished, publishedAt])
+  @@index([authorId, createdAt])
+}
+
+model NewsComment {
+  id        String            @id @default(uuid()) @db.Uuid
+  postId    String            @db.Uuid
+  post      NewsPost          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String            @db.Uuid
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  body      String            @db.VarChar(1200)
+  createdAt DateTime          @default(now())
+  editedAt  DateTime?
+  votes     NewsCommentVote[]
+
+  @@index([postId, createdAt])
+  @@index([userId, createdAt])
+}
+
+model NewsCommentVote {
+  userId    String      @db.Uuid
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commentId String      @db.Uuid
+  comment   NewsComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  value     Int
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@id([userId, commentId])
+  @@index([commentId, value])
+}
+
+model ContestRegistration {
+  id           String   @id @default(uuid()) @db.Uuid
+  contestId    String   @db.Uuid
+  contest      Contest  @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  userId       String   @db.Uuid
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  registeredAt DateTime @default(now())
+
+  @@unique([contestId, userId])
+  @@index([contestId, registeredAt])
+  @@index([userId])
+}
+
+model Submission {
+  id               String              @id @default(uuid()) @db.Uuid
+  userId           String              @db.Uuid
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contestId        String              @db.Uuid
+  contest          Contest             @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  problemId        String              @db.Uuid
+  problem          Problem             @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  imageUrl         String              @db.VarChar(500)
+  status           SubmissionStatus    @default(QUEUED)
+  preliminaryScore Int?
+  finalScore       Int?
+  aiComment        String              @default("") @db.Text
+  adminComment     String              @default("") @db.Text
+  isPublic         Boolean             @default(true)
+  file             SubmissionFile?
+  comments         SubmissionComment[]
+  evaluations      Evaluation[]
+  evaluationJobs   EvaluationJob[]
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@index([contestId, createdAt])
+  @@index([contestId, userId, problemId, createdAt])
+  @@index([userId, createdAt])
+  @@index([problemId, createdAt])
+  @@index([status, createdAt])
+}
+
+model SubmissionFile {
+  id           String     @id @default(uuid()) @db.Uuid
+  submissionId String     @unique @db.Uuid
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  storageKey   String     @unique @db.VarChar(180)
+  originalName String     @db.VarChar(255)
+  mimeType     String     @db.VarChar(80)
+  sizeBytes    Int
+  sha256       String     @db.Char(64)
+  createdAt    DateTime   @default(now())
+}
+
+model SubmissionComment {
+  id           String                @id @default(uuid()) @db.Uuid
+  submissionId String                @db.Uuid
+  submission   Submission            @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  kind         SubmissionCommentKind
+  body         String                @db.Text
+  isPrivate    Boolean               @default(false)
+  createdAt    DateTime              @default(now())
+
+  @@index([submissionId, createdAt])
+}
+
+model AdminAction {
+  id         String   @id @default(uuid()) @db.Uuid
+  adminId    String?  @db.Uuid
+  admin      User?    @relation("AdminActionAuthor", fields: [adminId], references: [id], onDelete: SetNull)
+  action     String   @db.VarChar(80)
+  entityType String   @db.VarChar(50)
+  entityId   String   @db.VarChar(120)
+  summary    String   @db.Text
+  details    Json?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
+  @@index([adminId, createdAt])
+}
+
+model Evaluation {
+  id               String                @id @default(uuid()) @db.Uuid
+  submissionId     String                @db.Uuid
+  submission       Submission            @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  mode             EvaluationMode        @default(PRELIMINARY)
+  status           EvaluationStatus      @default(PROCESSING)
+  score            Int?
+  maxScore         Int
+  confidence       EvaluationConfidence?
+  confidenceValue  Float?
+  recognizedText   String                @default("") @db.Text
+  comment          String                @default("") @db.Text
+  geometryDetected Boolean               @default(false)
+  rubricSnapshot   String                @default("") @db.Text
+  error            String                @default("") @db.Text
+  startedAt        DateTime              @default(now())
+  completedAt      DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  runs             JudgeModelRun[]
+
+  @@index([submissionId, createdAt])
+  @@index([status, createdAt])
+}
+
+model ContestFinalization {
+  id             String                    @id @default(uuid()) @db.Uuid
+  contestId      String                    @unique @db.Uuid
+  contest        Contest                   @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  requestedById  String?                   @db.Uuid
+  requestedBy    User?                     @relation("FinalizationRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  status         ContestFinalizationStatus @default(QUEUED)
+  queuedCount    Int                       @default(0)
+  completedCount Int                       @default(0)
+  failedCount    Int                       @default(0)
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+  jobs           EvaluationJob[]
+
+  @@index([status, createdAt])
+  @@index([requestedById, createdAt])
+}
+
+model EvaluationJob {
+  id             String               @id @default(uuid()) @db.Uuid
+  submissionId   String               @db.Uuid
+  submission     Submission           @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  finalizationId String?              @db.Uuid
+  finalization   ContestFinalization? @relation(fields: [finalizationId], references: [id], onDelete: Cascade)
+  mode           EvaluationMode
+  status         QueueJobStatus       @default(QUEUED)
+  attempts       Int                  @default(0)
+  maxAttempts    Int                  @default(3)
+  availableAt    DateTime             @default(now())
+  lockedAt       DateTime?
+  workerId       String?              @db.VarChar(120)
+  error          String               @default("") @db.Text
+  completedAt    DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@index([status, availableAt, createdAt])
+  @@index([finalizationId, status])
+  @@index([submissionId, createdAt])
+}
+
+model JudgeModelRun {
+  id           String        @id @default(uuid()) @db.Uuid
+  evaluationId String        @db.Uuid
+  evaluation   Evaluation    @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  stage        JudgeRunStage
+  provider     String        @db.VarChar(80)
+  success      Boolean
+  confidence   Float?
+  inputChars   Int           @default(0)
+  output       Json?
+  latencyMs    Int
+  error        String        @default("") @db.Text
+  createdAt    DateTime      @default(now())
+
+  @@index([evaluationId, createdAt])
+  @@index([stage, createdAt])
+}
+
+model RateLimitWindow {
+  key       String   @id @db.VarChar(200)
+  count     Int
+  resetAt   DateTime
+  updatedAt DateTime @updatedAt
+
+  @@index([resetAt])
+}
+
+model RatingCalculation {
+  id               String         @id @default(uuid()) @db.Uuid
+  contestId        String         @unique @db.Uuid
+  contest          Contest        @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  formulaVersion   String         @db.VarChar(40)
+  participantCount Int
+  resultsRevision  Int            @default(0)
+  calculatedById   String?        @db.Uuid
+  calculatedBy     User?          @relation("RatingCalculationAuthor", fields: [calculatedById], references: [id], onDelete: SetNull)
+  metadata         Json?
+  calculatedAt     DateTime       @default(now())
+  changes          RatingChange[]
+
+  @@index([calculatedAt])
+  @@index([calculatedById, calculatedAt])
+}
+
+model ContestRatingSnapshot {
+  id               String              @id @default(uuid()) @db.Uuid
+  contestId        String              @unique @db.Uuid
+  contest          Contest             @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  durationMinutes  Int
+  maxScore         Int
+  participantCount Int
+  capturedAt       DateTime            @default(now())
+  seeds            ContestRatingSeed[]
+
+  @@index([capturedAt])
+}
+
+model ContestRatingSeed {
+  id            String                @id @default(uuid()) @db.Uuid
+  snapshotId    String                @db.Uuid
+  snapshot      ContestRatingSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  userId        String                @db.Uuid
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ratingAtStart Int
+  seedPlace     Int
+  expectedPlace Float
+  registeredAt  DateTime
+  createdAt     DateTime              @default(now())
+
+  @@unique([snapshotId, userId])
+  @@index([snapshotId, seedPlace])
+  @@index([userId, createdAt])
+}
+
+model RatingChange {
+  id             String            @id @default(uuid()) @db.Uuid
+  calculationId  String            @db.Uuid
+  calculation    RatingCalculation @relation(fields: [calculationId], references: [id], onDelete: Cascade)
+  contestId      String            @db.Uuid
+  contest        Contest           @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  userId         String            @db.Uuid
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  previousRating Int?
+  newRating      Int
+  delta          Int
+  place          Int
+  totalScore     Int
+  expectedScore  Float
+  actualScore    Float
+  ratingAtStart  Int?
+  seedPlace      Int?
+  expectedPlace  Float?
+  performance    Float?
+  contestWeight  Float?
+  createdAt      DateTime          @default(now())
+
+  @@unique([contestId, userId])
+  @@index([userId, createdAt])
+  @@index([calculationId])
+  @@index([contestId, place])
+}

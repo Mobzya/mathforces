@@ -1,0 +1,57 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mathforces}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER:-mathforces}
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mathforces} -d ${POSTGRES_DB:-mathforces}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  migrate:
+    build: .
+    command: ["npm", "run", "db:deploy"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment: &app-environment
+      DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-15}
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL with postgres service hostname}
+      HEALTH_MAX_QUEUE_AGE_SECONDS: ${HEALTH_MAX_QUEUE_AGE_SECONDS:-120}
+      SUBMISSION_STORAGE_DIR: /data/submissions
+      TESSERACT_BINARY: tesseract
+      TESSERACT_LANGUAGES: ${TESSERACT_LANGUAGES:-rus+eng,eng}
+
+  web:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment: *app-environment
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    volumes:
+      - submission-data:/data/submissions
+
+  worker:
+    build: .
+    command: ["npm", "run", "worker:judge"]
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment: *app-environment
+    volumes:
+      - submission-data:/data/submissions
+
+volumes:
+  postgres-data:
+  submission-data:

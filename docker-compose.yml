@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: mathforces-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mathforces
+      POSTGRES_USER: mathforces
+      POSTGRES_PASSWORD: mathforces
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - mathforces-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mathforces -d mathforces"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  mathforces-postgres-data:

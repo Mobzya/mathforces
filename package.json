@@ -1,0 +1,87 @@
+{
+  "name": "mathforces",
+  "version": "0.1.0",
+  "description": "Платформа для школьных математических контестов, автоматической проверки и рейтинга.",
+  "private": true,
+  "author": "Mobzya",
+  "homepage": "https://github.com/Mobzya/mathforces#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mobzya/mathforces.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Mobzya/mathforces/issues"
+  },
+  "type": "module",
+  "packageManager": "npm@12.0.0",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:lan": "node scripts/dev.mjs --lan",
+    "dev:web": "next dev --webpack",
+    "dev:web:lan": "next dev --webpack --hostname 0.0.0.0",
+    "build": "npm run db:generate && next build --webpack",
+    "start": "next start",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test:unit",
+    "security:audit": "npm audit --audit-level=high",
+    "db:generate": "prisma generate",
+    "db:validate": "prisma validate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:status": "prisma migrate status",
+    "db:seed:test-contest": "node scripts/create-test-contest.mjs",
+    "backup:create": "bash scripts/backup.sh",
+    "test:smoke": "node scripts/smoke.mjs",
+    "test:unit": "node --import tsx --test tests/*.test.ts",
+    "test:avatar": "node scripts/avatar-smoke.mjs",
+    "test:account": "node scripts/account-security-smoke.mjs",
+    "test:queue": "node --disable-warning=DEP0205 --import tsx scripts/queue-smoke.ts",
+    "test:cycle": "node --disable-warning=DEP0205 --import tsx scripts/full-cycle-smoke.ts",
+    "test:integrity": "node --disable-warning=DEP0205 --import tsx scripts/db-integrity.ts",
+    "test:load": "node scripts/load-smoke.mjs",
+    "test:submission": "node scripts/submission-smoke.mjs",
+    "worker:judge": "node --disable-warning=DEP0205 --import tsx workers/judge-worker/cli.ts",
+    "worker:judge:once": "node --disable-warning=DEP0205 --import tsx workers/judge-worker/cli.ts --once"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.9.1",
+    "@prisma/client": "7.9.1",
+    "lucide-react": "1.25.0",
+    "next": "16.2.12",
+    "pg": "8.22.0",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "^26.0.0",
+    "@types/pg": "^8.15.5",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.2.12",
+    "postcss": "8.5.25",
+    "prettier": "3.9.6",
+    "prisma": "7.9.1",
+    "tailwindcss": "4.3.3",
+    "tsx": "^4.20.6",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "overrides": {
+    "postcss": "8.5.25",
+    "sharp": "0.35.3"
+  },
+  "allowScripts": {
+    "@prisma/engines@7.9.1": true,
+    "esbuild@0.25.12": true,
+    "prisma@7.9.1": true,
+    "sharp@0.35.3": true,
+    "unrs-resolver@1.12.2": true
+  }
+}
