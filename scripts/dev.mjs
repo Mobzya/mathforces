@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync, unlinkSync } from "node:fs";
+import { Socket } from "node:net";
 import { networkInterfaces } from "node:os";
 import { resolve } from "node:path";
 
@@ -17,7 +18,7 @@ await runStep(npm, ["run", "db:deploy"], 30_000).catch((error) => {
 });
 console.log("[Mathforces 2/3] База готова.");
 
-clearStaleNextLock();
+await clearStaleNextLock();
 
 console.log("[Mathforces 3/3] Запускаем web и фоновую проверку посылок…");
 if (lanMode) printLanAddresses(port);
@@ -63,19 +64,32 @@ function windowlessExit(code) {
   setTimeout(() => process.exit(code), 500).unref();
 }
 
-function clearStaleNextLock() {
+async function clearStaleNextLock() {
   if (!existsSync(lockPath)) return;
   try {
     const lock = JSON.parse(readFileSync(lockPath, "utf8"));
     if (Number.isInteger(lock.pid)) {
+      let processExists = false;
       try {
         process.kill(lock.pid, 0);
+        processExists = true;
+      } catch (error) {
+        if (error?.code !== "ESRCH") throw error;
+      }
+
+      const startedRecently =
+        Number.isFinite(lock.startedAt) && Date.now() - lock.startedAt >= 0
+          ? Date.now() - lock.startedAt < 15_000
+          : false;
+      const portIsActive = processExists
+        ? await isTcpReachable(lock.hostname ?? "127.0.0.1", validPort(lock.port) ?? port)
+        : false;
+
+      if (processExists && (startedRecently || portIsActive)) {
         throw new Error(
           `Next.js уже запущен (PID ${lock.pid}, ${lock.appUrl ?? "port unknown"}). ` +
             "Остановите предыдущий npm run dev через Ctrl+C."
         );
-      } catch (error) {
-        if (error?.code !== "ESRCH") throw error;
       }
     }
     unlinkSync(lockPath);
@@ -87,6 +101,22 @@ function clearStaleNextLock() {
     }
     throw error;
   }
+}
+
+function isTcpReachable(hostname, publicPort) {
+  return new Promise((resolvePromise) => {
+    const socket = new Socket();
+    const finish = (reachable) => {
+      socket.destroy();
+      resolvePromise(reachable);
+    };
+
+    socket.setTimeout(700);
+    socket.once("connect", () => finish(true));
+    socket.once("timeout", () => finish(false));
+    socket.once("error", () => finish(false));
+    socket.connect(publicPort, hostname);
+  });
 }
 
 function runStep(command, args, timeoutMs) {
