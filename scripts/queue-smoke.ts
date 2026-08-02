@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 
-process.loadEnvFile?.(".env");
+if (existsSync(".env")) process.loadEnvFile?.(".env");
 
 const { prisma } = await import("@/server/db/client");
 const { enqueueContestFinalization, enqueueEvaluation, refreshContestFinalization } =

@@ -1,7 +1,8 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import pg from "pg";
 
-process.loadEnvFile?.(".env");
+if (existsSync(".env")) process.loadEnvFile?.(".env");
 
 const baseUrl = (process.env.SMOKE_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const databaseUrl = process.env.DATABASE_URL;
